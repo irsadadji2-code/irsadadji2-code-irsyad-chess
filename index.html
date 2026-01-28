@@ -1,121 +1,235 @@
-                        const moves = getLegalMoves(r, c);
-                        if (moves.length > 0) return false;
-                    }
-                }
-            }
-            return true;
-        }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Irsyad Chess</title>
 
-        function isDraw() {
-            // Simplified draw: no legal moves and not in check
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    if (board[r][c] && isPieceColor(board[r][c], currentTurn)) {
-                        if (getLegalMoves(r, c).length > 0) return false;
-                    }
-                }
-            }
-            return !isInCheck(currentTurn);
-        }
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 
-        // =============================
-        // COMPUTER AI (Simple but real)
-        // =============================
-        function computerMove() {
-            let allMoves = [];
-            for (let r = 0; r < 8; r++) {
-                for (let c = 0; c < 8; c++) {
-                    if (board[r][c] && isPieceColor(board[r][c], 'black')) {
-                        const moves = getLegalMoves(r, c);
-                        moves.forEach(m => {
-                            allMoves.push({ from: [r, c], to: m });
-                        });
-                    }
-                }
-            }
+<style>
+body {
+    font-family: 'Inter', sans-serif;
+    background:#1e1e1e;
+    color:white;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    margin:0;
+    padding:20px;
+}
 
-            if (allMoves.length === 0) return;
+h1 { margin-bottom:10px }
 
-            // Random legal move (aman, tidak error)
-            const move = allMoves[Math.floor(Math.random() * allMoves.length)];
-            movePiece(move.from[0], move.from[1], move.to[0], move.to[1]);
-        }
+.board {
+    display:grid;
+    grid-template-columns:repeat(8,1fr);
+    width:400px;
+    height:400px;
+    border-radius:8px;
+    overflow:hidden;
+    box-shadow:0 0 20px rgba(0,0,0,.5);
+}
 
-        // =============================
-        // NOTIFICATION
-        // =============================
-        function showNotification(text) {
-            notificationElement.textContent = text;
-            notificationElement.style.display = 'block';
-            setTimeout(() => {
-                notificationElement.style.display = 'none';
-            }, 2000);
-        }
+.square {
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:40px;
+    cursor:pointer;
+    transition:.2s;
+}
 
-        // =============================
-        // TIMER
-        // =============================
-        function startTimer() {
-            clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-                timers[currentTurn]++;
-                updateTimer();
-            }, 1000);
-        }
+.square.white { background:#eeeed2 }
+.square.black { background:#769656 }
 
-        function updateTimer() {
-            const w = formatTime(timers.white);
-            const b = formatTime(timers.black);
-            timerElement.textContent = `White: ${w} | Black: ${b}`;
-        }
+.square.selected { background:#f6f669 !important }
+.square.highlight { background:#baca44 !important }
 
-        function formatTime(sec) {
-            const m = String(Math.floor(sec / 60)).padStart(2, '0');
-            const s = String(sec % 60).padStart(2, '0');
-            return `${m}:${s}`;
-        }
+.controls { margin:15px }
+button {
+    background:#333;
+    color:white;
+    border:none;
+    padding:10px 15px;
+    border-radius:5px;
+    cursor:pointer;
+}
+button:hover { background:#555 }
 
-        // =============================
-        // RESET & NEW GAME
-        // =============================
-        function resetGame() {
-            board = [
-                ['r','n','b','q','k','b','n','r'],
-                ['p','p','p','p','p','p','p','p'],
-                ['','','','','','','',''],
-                ['','','','','','','',''],
-                ['','','','','','','',''],
-                ['','','','','','','',''],
-                ['P','P','P','P','P','P','P','P'],
-                ['R','N','B','Q','K','B','N','R']
-            ];
-            currentTurn = 'white';
-            gameOver = false;
-            timers = { white: 0, black: 0 };
-            clearSelection();
-            initBoard();
-            startTimer();
-            statusElement.textContent = "White's turn";
-        }
+.status { margin-top:10px }
+.timer { font-size:14px; opacity:.8 }
+</style>
+</head>
 
-        newGameBtn.onclick = resetGame;
-        resetBtn.onclick = resetGame;
+<body>
+<h1>♟️ Irsyad Chess</h1>
 
-        // =============================
-        // MODE SWITCH
-        // =============================
-        document.querySelectorAll('input[name="mode"]').forEach(radio => {
-            radio.addEventListener('change', e => {
-                mode = e.target.value;
-                roomInput.style.display = mode === 'multi' ? 'block' : 'none';
-            });
-        });
+<div class="controls">
+<button id="newGame">New Game</button>
+</div>
 
-        // =============================
-        // INIT GAME
-        // =============================
-        initBoard();
-        startTimer();
-    </script>
+<div class="status" id="status">Your move</div>
+<div class="timer" id="timer">00:00</div>
+
+<div class="board" id="board"></div>
+
+<script>
+const pieces={
+'K':'♔','Q':'♕','R':'♖','B':'♗','N':'♘','P':'♙',
+'k':'♚','q':'♛','r':'♜','b':'♝','n':'♞','p':'♟'
+};
+
+let board=[
+['r','n','b','q','k','b','n','r'],
+['p','p','p','p','p','p','p','p'],
+['','','','','','','',''],
+['','','','','','','',''],
+['','','','','','','',''],
+['','','','','','','',''],
+['P','P','P','P','P','P','P','P'],
+['R','N','B','Q','K','B','N','R']
+];
+
+let turn='white',selected=null,legal=[],gameOver=false;
+const boardEl=document.getElementById('board');
+const statusEl=document.getElementById('status');
+
+function initBoard(){
+boardEl.innerHTML='';
+for(let r=0;r<8;r++){
+for(let c=0;c<8;c++){
+const s=document.createElement('div');
+s.className='square '+((r+c)%2?'black':'white');
+s.dataset.r=r; s.dataset.c=c;
+s.textContent=board[r][c]?pieces[board[r][c]]:'';
+s.onclick=()=>clickSquare(r,c);
+boardEl.appendChild(s);
+}}}
+
+function clickSquare(r,c){
+if(gameOver) return;
+if(selected){
+if(legal.some(m=>m[0]==r&&m[1]==c)){
+move(selected[0],selected[1],r,c);
+}else clear();
+}
+else if(board[r][c]&&isColor(board[r][c],turn)){
+select(r,c);
+}}
+
+function select(r,c){
+clear();
+selected=[r,c];
+square(r,c).classList.add('selected');
+legal=getMoves(r,c);
+legal.forEach(m=>square(m[0],m[1]).classList.add('highlight'));
+}
+
+function clear(){
+selected=null; legal=[];
+document.querySelectorAll('.square').forEach(s=>s.classList.remove('selected','highlight'));
+}
+
+function move(fr,fc,tr,tc){
+board[tr][tc]=board[fr][fc];
+board[fr][fc]='';
+clear();
+draw();
+turn=turn==='white'?'black':'white';
+statusEl.textContent=turn==='white'?'Your move':'Computer thinking...';
+if(turn==='black') setTimeout(aiMove,300);
+}
+
+function draw(){
+document.querySelectorAll('.square').forEach(s=>{
+const r=s.dataset.r,c=s.dataset.c;
+s.textContent=board[r][c]?pieces[board[r][c]]:'';
+});
+}
+
+function square(r,c){return document.querySelector(`.square[data-r="${r}"][data-c="${c}"]`);}
+function isColor(p,c){return c==='white'?p===p.toUpperCase():p===p.toLowerCase();}
+
+function getMoves(r,c){
+const p=board[r][c].toLowerCase();
+let m=[];
+if(p==='p'){
+const d=board[r][c]==='P'?-1:1;
+if(!board[r+d]?.[c]) m.push([r+d,c]);
+if(board[r+d]?.[c+1]&&!isColor(board[r+d][c+1],turn)) m.push([r+d,c+1]);
+if(board[r+d]?.[c-1]&&!isColor(board[r+d][c-1],turn)) m.push([r+d,c-1]);
+}
+if(p==='r'||p==='q') slide(r,c,[[1,0],[-1,0],[0,1],[0,-1]],m);
+if(p==='b'||p==='q') slide(r,c,[[1,1],[1,-1],[-1,1],[-1,-1]],m);
+if(p==='n') [[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]].forEach(d=>{
+let nr=r+d[0],nc=c+d[1];
+if(nr>=0&&nr<8&&nc>=0&&nc<8&&(!board[nr][nc]||!isColor(board[nr][nc],turn))) m.push([nr,nc]);
+});
+if(p==='k') [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]].forEach(d=>{
+let nr=r+d[0],nc=c+d[1];
+if(nr>=0&&nr<8&&nc>=0&&nc<8&&(!board[nr][nc]||!isColor(board[nr][nc],turn))) m.push([nr,nc]);
+});
+return m.filter(x=>x[0]>=0&&x[0]<8&&x[1]>=0&&x[1]<8);
+}
+
+function slide(r,c,dirs,m){
+dirs.forEach(d=>{
+let nr=r+d[0],nc=c+d[1];
+while(nr>=0&&nr<8&&nc>=0&&nc<8){
+if(!board[nr][nc]) m.push([nr,nc]);
+else{ if(!isColor(board[nr][nc],turn)) m.push([nr,nc]); break;}
+nr+=d[0]; nc+=d[1];
+}});
+}
+
+/* ===== SMART AI (MINIMAX) ===== */
+const val={p:10,n:30,b:30,r:50,q:90,k:900};
+
+function score(){
+let s=0;
+for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+const p=board[r][c];
+if(p) s+=(p===p.toLowerCase()?val[p]:-val[p]);
+}
+return s;
+}
+
+function minimax(d,max){
+if(d==0) return score();
+let best=max?-1e9:1e9;
+for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+if(board[r][c]&&isColor(board[r][c],max?'black':'white')){
+getMoves(r,c).forEach(m=>{
+const b=board[m[0]][m[1]];
+board[m[0]][m[1]]=board[r][c]; board[r][c]='';
+let s=minimax(d-1,!max);
+board[r][c]=board[m[0]][m[1]]; board[m[0]][m[1]]=b;
+best=max?Math.max(best,s):Math.min(best,s);
+});
+}}
+return best;
+}
+
+function aiMove(){
+let best=-1e9,move=null;
+for(let r=0;r<8;r++)for(let c=0;c<8;c++){
+if(board[r][c]&&isColor(board[r][c],'black')){
+getMoves(r,c).forEach(m=>{
+const b=board[m[0]][m[1]];
+board[m[0]][m[1]]=board[r][c]; board[r][c]='';
+let s=minimax(2,false);
+board[r][c]=board[m[0]][m[1]]; board[m[0]][m[1]]=b;
+if(s>best){best=s; move=[r,c,m[0],m[1]];}
+});
+}}
+if(move) movePiece(...move);
+}
+
+function movePiece(a,b,c,d){move(a,b,c,d);}
+
+document.getElementById('newGame').onclick=()=>location.reload();
+initBoard();
+</script>
 </body>
 </html>
